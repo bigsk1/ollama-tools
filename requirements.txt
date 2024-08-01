@@ -1,0 +1,9 @@
+python-dotenv
+requests
+rich
+langchain-ollama
+openai
+anthropic
+tavily-python
+ollama
+langchain-ollama
