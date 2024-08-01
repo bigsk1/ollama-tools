@@ -10,7 +10,8 @@ Ollama Tools AI is a work-in-progress project focused on implementing advanced A
 
 - **Function Calling**: Seamlessly integrate and call various functions to perform tasks.
 - **Tool Usage**: Utilize different tools for enhanced AI capabilities.
-- **Asynchronous Operations**: Efficient handling of asynchronous tasks and operations.
+- **Web Search**: Use searXNG or Tavily for web searches
+- **Create**: The AI will create folders and files, read files, list files, delete files, summarize images, news, weather, and more 
 
 
 ```env
