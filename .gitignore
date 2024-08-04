@@ -136,4 +136,7 @@ target/
 # JupyterLab
 .jupyterlab-settings/
 
+# db
+chromadb
+
 # Add additional excludes if needed below this line

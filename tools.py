@@ -26,14 +26,10 @@ logging.basicConfig(
 
 log = logging.getLogger("rich")
 
-# Constants
-WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
-NEWS_API_KEY = os.getenv("NEWS_API_KEY")
-
 
 class AITools:
     @staticmethod
-    def create_folder(path: str) -> Dict[str, Any]:
+    async def create_folder(path: str) -> Dict[str, Any]:
         full_path = os.path.abspath(path)
         try:
             os.makedirs(full_path, exist_ok=True)
@@ -44,7 +40,7 @@ class AITools:
             return {"success": False, "error": str(e)}
 
     @staticmethod
-    def create_file(path: str, content: str = "") -> Dict[str, Any]:
+    async def create_file(path: str, content: str = "") -> Dict[str, Any]:
         full_path = os.path.abspath(path)
         try:
             with open(full_path, 'w') as f:
@@ -56,7 +52,7 @@ class AITools:
             return {"success": False, "error": str(e)}
         
     @staticmethod
-    def write_to_file(path: str, content: str) -> Dict[str, Any]:
+    async def write_to_file(path: str, content: str) -> Dict[str, Any]:
         full_path = os.path.abspath(path)
         try:
             with open(full_path, 'w') as f:
@@ -68,7 +64,7 @@ class AITools:
             return {"success": False, "error": str(e)}
 
     @staticmethod
-    def read_file(path: str) -> Dict[str, Any]:
+    async def read_file(path: str) -> Dict[str, Any]:
         full_path = os.path.abspath(path)
         try:
             with open(full_path, 'r') as f:
@@ -80,7 +76,7 @@ class AITools:
             return {"success": False, "error": str(e)}
 
     @staticmethod
-    def list_files(path: str = ".") -> Dict[str, Any]:
+    async def list_files(path: str = ".") -> Dict[str, Any]:
         full_path = os.path.abspath(path)
         try:
             files = os.listdir(full_path)
@@ -91,7 +87,7 @@ class AITools:
             return {"success": False, "error": str(e)}
 
     @staticmethod
-    def delete_file(path: str) -> Dict[str, Any]:
+    async def delete_file(path: str) -> Dict[str, Any]:
         full_path = os.path.abspath(path)
         try:
             os.remove(full_path)
@@ -196,13 +192,13 @@ def get_tool_by_name(name: str) -> Dict[str, Any]:
             return tool
     return None
 
-def execute_tool(tool_name: str, **kwargs) -> Dict[str, Any]:
+async def execute_tool(tool_name: str, **kwargs) -> Dict[str, Any]:
     tool = getattr(AITools, tool_name, None)
     if tool is None:
         return {"success": False, "error": f"Tool '{tool_name}' not found"}
     
     try:
-        result = tool(**kwargs)
+        result = await tool(**kwargs)
         return result
     except Exception as e:
         log.error(f"Error executing tool '{tool_name}': {str(e)}")
