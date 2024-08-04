@@ -140,7 +140,7 @@ async def chat_loop():
                     if tool_name == "search":
                         console.print(f"[bold cyan]Search provider:[/bold cyan] {SEARCH_PROVIDER}")
                     
-                    result = await execute_tool(tool_name, **arguments)
+                    result = execute_tool(tool_name, **arguments)
 
                     if result["success"]:
                         console.print(f"[bold green]Tool executed successfully.[/bold green]")
