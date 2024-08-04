@@ -11,30 +11,33 @@ Ollama Tools AI is a work-in-progress project focused on implementing advanced A
 - **Function Calling**: Seamlessly integrate and call various functions to perform tasks.
 - **Tool Usage**: Utilize different tools for enhanced AI capabilities.
 - **Web Search**: Use searXNG or Tavily for web searches
-- **Create**: The AI will create folders and files, read files, list files, delete files, summarize images, news, weather, and more 
+- **Create**: The AI will create folders and files, read files, list files, delete files, web search and more..
+- **DB Similarity**: Every chat and tool use is saved in DB for future context aware AI responses.
 
 
 ```env
 # API Keys
-# ANTHROPIC_API_KEY=
-# OPENAI_API_KEY=
 TAVILY_API_KEY=tvly-
 
-# WEATHER_API_KEY=
-# NEWS_API_KEY=
+# Models
+OLLAMA_MODEL=llama3-groq-tool-use
+EMBED_MODEL=nomic-embed-text
 
-
-# Models-  llama3-groq-tool-use , llama3.1 , llama3 , mistral
-OLLAMA_MODEL=llama3.1
-# CLAUDE_MODEL=claude-3-5-sonnet-20240620
-
-# Search  SEARXNG or TAVILY
-SEARCH_PROVIDER=TAVILY
+# Search Configuration
+SEARCH_PROVIDER=SEARXNG
 SEARCH_RESULTS_LIMIT=5
 
-# Urls
+# URLs
 OLLAMA_URL=http://127.0.0.1:11434
-SEARXNG_URL=http://192.168.1.20:4000
+SEARXNG_URL=http://192.168.70.48:4000
+
+# Database Configuration
+DB_DIR=./chromadb  # database location realitive to current directory
+N_CONTEXTS=3   # Number of contexts to retrieve from DB - you can adjust this for testing
+SIMILARITY_THRESHOLD=0.7  # Adjust this value to control context relevance (lower is more strict)
+
+# Debug print statements in terminal False or True
+DEBUG_MODE=False
 
 ```
 Install dependencies 
@@ -50,5 +53,7 @@ python ol.py
 
 
 ## More soon...
+
+![name](images/name.png)
 
 ![terminal](images/tav.png)
