@@ -140,3 +140,5 @@ target/
 chromadb
 
 # Add additional excludes if needed below this line
+
+__pycache__

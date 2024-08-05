@@ -1,10 +1,9 @@
-# db_utils.py
-
 import os
 import json
 import uuid
 import time
 import numpy as np
+import traceback 
 from typing import List, Dict, Any
 from dotenv import load_dotenv
 import chromadb
@@ -88,7 +87,7 @@ def retrieve_context(prompt: str) -> List[Dict[str, Any]]:
     ensure_collection_exists()
     
     try:
-        debug_print(f"Retrieving context for prompt: {prompt[:50]}...")  # Print first 50 chars of prompt
+        debug_print(f"Retrieving context for prompt: {prompt[:80]}...")  # Print first 50 chars of prompt
         prompt_embedding = get_embedding(prompt)
         if prompt_embedding is None:
             debug_print("Failed to get embedding for prompt, returning empty context")
@@ -101,7 +100,7 @@ def retrieve_context(prompt: str) -> List[Dict[str, Any]]:
             include=['documents', 'embeddings', 'metadatas']
         )
         
-        debug_print(f"Raw query results: {json.dumps(results, indent=2)}")
+        # debug_print(f"Raw query results: {json.dumps(results, indent=2)}")
         
         contexts = []
         if isinstance(results, dict) and 'documents' in results and results['documents']:

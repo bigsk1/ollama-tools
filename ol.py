@@ -1,22 +1,26 @@
 import os
+import io
 import json
 import asyncio
 import signal
 import traceback
+import logging
+from typing import List, Dict, Any, AsyncIterator
+from contextlib import redirect_stdout
+from urllib.parse import urlparse
+from textwrap import wrap
+from dotenv import load_dotenv
 from langchain_ollama import ChatOllama
 from langchain_core.messages import AIMessage
-from typing import List, Dict, Any
-from urllib.parse import urlparse
 from rich.console import Console
 from rich.prompt import Prompt
 from rich.panel import Panel
 from rich.markdown import Markdown
+from rich.live import Live
 from rich.table import Table
-from rich import box
 from rich.text import Text
+from rich import box
 from rich.markup import escape
-from textwrap import wrap
-from dotenv import load_dotenv
 from tools import AVAILABLE_TOOLS, execute_tool
 from search_utils import SEARCH_PROVIDER
 from db_utils import retrieve_context, add_to_vector_db
@@ -36,7 +40,6 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 
 # Disable unwanted logging
-import logging
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("chromadb").setLevel(logging.ERROR)  # Suppress ChromaDB warnings
 
@@ -64,7 +67,7 @@ def print_info(message):
 def print_warning(message):
     console.print(f"[bold yellow]WARNING: {message}[/bold yellow]")
 
-async def ollama_chat(llm: ChatOllama, prompt: str, tools: List[Dict[str, Any]]) -> AIMessage:
+async def ollama_chat(llm: ChatOllama, prompt: str, tools: List[Dict[str, Any]]) -> AsyncIterator[str]:
     global conversation_history
     
     # Retrieve context from the database
@@ -75,7 +78,7 @@ async def ollama_chat(llm: ChatOllama, prompt: str, tools: List[Dict[str, Any]])
         for idx, context in enumerate(contexts, 1):
             console.print(f"  Context {idx} (similarity: {context['similarity']:.4f}):")
             console.print(f"    Prompt: {context['prompt']}")
-            console.print(f"    Response: {context['response'][:50]}...")  # Truncate long responses
+            console.print(f"    Response: {context['response'][:75]}...")  # Truncate long responses
     else:
         print_info("No relevant contexts found.")
     
@@ -89,17 +92,17 @@ async def ollama_chat(llm: ChatOllama, prompt: str, tools: List[Dict[str, Any]])
         f"Response: {context['response']}\n"
         for idx, context in enumerate(contexts)
     ])
-    
+
     system_message = f"""You are a helpful AI assistant with access to previous conversation contexts and various tools. 
 Your responses should be informative, engaging, and tailored to the user's needs. 
-It is CRUCIAL that you carefully review and utilize the information from the provided contexts in your responses.
-The contexts are sorted by relevance, with the most relevant context listed first.
-Always prefer information from these contexts over making assumptions or using general knowledge.
+Carefully review the information from the provided contexts in your responses.
+The contexts are sorted by relevance, with the most relevant context listed first but take into account all previous context.
+Always prefer information from these contexts over making assumptions or using general knowledge. DO NOT use a tool unless the user asks you to do so.
 
 Here are the relevant contexts from previous conversations:
 {context_info}
 
-You MUST use this context information to inform your responses, especially for questions about personal information or previous interactions.
+You MUST use this context information to inform your responses from previous interactions.
 
 You may call one or more functions to assist with the user query. Don't make assumptions about what values to plug into functions. 
 For each function call return a json object with function name and arguments within <tool_call></tool_call> XML tags as follows:
@@ -109,10 +112,8 @@ For each function call return a json object with function name and arguments wit
 
 Here are the available tools:
 {tools_string}
-
-Remember, always prioritize the information from the provided contexts in your responses.
 """
-    
+
     messages = [
         {"role": "system", "content": system_message},
         *conversation_history,
@@ -121,33 +122,33 @@ Remember, always prioritize the information from the provided contexts in your r
     
     print_info("Sending request to Ollama")
     try:
-        response = await llm.ainvoke(messages)
+        response_stream = llm.astream(messages)
+        full_response = ""
+        async for chunk in response_stream:
+            if isinstance(chunk, AIMessage):
+                content = chunk.content
+                full_response += content
+                yield content
         
-        # Process the response
-        if isinstance(response, AIMessage):
-            content = response.content
-            conversation_history.append({"role": "user", "content": prompt})
-            conversation_history.append({"role": "assistant", "content": content})
-            
-            # Add the new interaction to the vector database
-            print_info("Adding new interaction to vector DB")
-            add_to_vector_db({
-                "prompt": prompt,
-                "response": content
-            })
-        else:
-            console.print(Panel(f"[bold red]Error:[/bold red] Unexpected response type: {type(response)}", border_style="red"))
-            content = "I'm sorry, I encountered an error and couldn't process your request."
+        # Add the new interaction to the vector database
+        # print_info("Adding new interaction to vector DB")
+        add_to_vector_db({
+            "prompt": prompt,
+            "response": full_response
+        })
+        
+        conversation_history.append({"role": "user", "content": prompt})
+        conversation_history.append({"role": "assistant", "content": full_response})
         
         if len(conversation_history) > 10:
             conversation_history = conversation_history[-10:]
         
-        return AIMessage(content=content)
     except Exception as e:
         print_warning(f"Error in ollama_chat: {str(e)}")
         if DEBUG_MODE:
             print_debug(f"Exception details: {traceback.format_exc()}")
-        return AIMessage(content="I'm sorry, I encountered an error and couldn't process your request.")
+        yield "I'm sorry, I encountered an error and couldn't process your request."
+
 
 async def process_tool_calls(content: str) -> str:
     while "<tool_call>" in content:
@@ -169,18 +170,37 @@ async def process_tool_calls(content: str) -> str:
 
             if result["success"]:
                 print_info(f"Tool executed successfully.")
-                if tool_name == "search":
+                if tool_name == "list_files":
+                    files_list = "\n".join(result["files"])
+                    tool_response = f"Here are the files and directories in the specified path:\n\n{files_list}"
+                elif tool_name == "search":
                     if result["results"]:
-                        format_search_results(result["results"])
+                        # Capture the output of format_search_results using Rich's Console
+                        capture_console = Console(record=True, width=120)  # Adjust width as needed
+                        
+                        # Capture the table
+                        with capture_console.capture() as capture:
+                            format_search_results(result["results"])
+                        table_output = capture_console.export_text(clear=False)
+                        
+                        # Capture the URL links
+                        url_links = "Full URLs:\n"
+                        for i, result_item in enumerate(result["results"], 1):
+                            url = result_item.get("url", "N/A")
+                            url_links += f"{i}. {url}\n"
+                        
+                        # Combine the table and URL links in a code block
+                        tool_response = f"```\n{table_output}\n{url_links}\n```"
                     else:
-                        print_info("No search results found.")
+                        tool_response = "No search results found."
+                else:
+                    tool_response = f"Tool result: {json.dumps(result, indent=2)}"
             else:
                 print_warning(f"Error executing tool: {result.get('error', 'Unknown error')}")
+                tool_response = f"Error executing {tool_name}: {result.get('error', 'Unknown error')}"
             
-            # Remove the tool call and response from the content
-            tool_response_start = content.index("<tool_response>", tool_call_end)
-            tool_response_end = content.index("</tool_response>", tool_response_start)
-            content = content[:tool_call_start] + content[tool_response_end + 16:]
+            # Replace the tool call with the tool response
+            content = content[:tool_call_start] + f"<tool_response>\n{tool_response}\n</tool_response>" + content[tool_call_end + 12:]
         
         except ValueError as e:
             if "substring not found" in str(e):
@@ -197,7 +217,7 @@ async def process_tool_calls(content: str) -> str:
 
 async def chat_loop():
     console.print(Panel(
-        "[bold blue]Welcome to the Integrated Context-Aware Ollama AI Assistant![/bold blue]\n"
+        "[bold blue]Welcome to the Ollama AI Assistant![/bold blue]\n"
         f"[green]Using model: {OLLAMA_MODEL}[/green]\n"
         "[yellow]Type 'exit', 'quit', or 'bye' to end the conversation.[/yellow]",
         title="AI Assistant",
@@ -231,16 +251,19 @@ async def chat_loop():
             print_debug(f"Received user input: {user_input}")
             
             console.print("\n[bold yellow]AI Assistant[/bold yellow]")
-            with console.status("[bold green]Thinking...[/bold green]", spinner="dots"):
-                response = await ollama_chat(llm, user_input, tools)
+            with Live(Text(), refresh_per_second=4) as live:
+                response_text = Text()
+                async for chunk in ollama_chat(llm, user_input, tools):
+                    response_text.append(chunk)
+                    live.update(response_text)
                 
-                # Process the response content
-                content = await process_tool_calls(response.content)
+                # Process tool calls after the response is complete
+                content = response_text.plain
+                processed_content = await process_tool_calls(content)
                 
-                # Display the final response
-                console.print("\n")
-                console.print(Markdown(content))
-                console.print("\n")
+                # Display the final processed response
+                live.update(Markdown(processed_content))
+                # console.print("\n")
 
             print_debug("Finished processing user input")
         except Exception as e:
@@ -297,5 +320,5 @@ if __name__ == "__main__":
         if DEBUG_MODE:
             print_debug(f"Exception details: {traceback.format_exc()}")
     finally:
-        console.print("\n[bold green]Thank you for using the Integrated Context-Aware Ollama AI Assistant. Goodbye![/bold green]")
+        console.print("\n[bold green]Thank you for using the Ollama AI Assistant. Goodbye![/bold green]")
     print_debug("Script ended")
