@@ -23,7 +23,7 @@ from rich import box
 from rich.markup import escape
 from tools import AVAILABLE_TOOLS, execute_tool
 from search_utils import SEARCH_PROVIDER
-from db_utils import retrieve_context, add_to_vector_db
+from db_utils import retrieve_context, add_to_vector_db, EMBED_MODEL
 
 # Load environment variables
 load_dotenv()
@@ -78,7 +78,7 @@ async def ollama_chat(llm: ChatOllama, prompt: str, tools: List[Dict[str, Any]])
         for idx, context in enumerate(contexts, 1):
             console.print(f"  Context {idx} (similarity: {context['similarity']:.4f}):")
             console.print(f"    Prompt: {context['prompt']}")
-            console.print(f"    Response: {context['response'][:75]}...")  # Truncate long responses
+            console.print(f"    Response: {context['response'][:90]}...")  # Truncate long responses
     else:
         print_info("No relevant contexts found.")
     
@@ -218,9 +218,10 @@ async def process_tool_calls(content: str) -> str:
 async def chat_loop():
     console.print(Panel(
         "[bold blue]Welcome to the Ollama AI Assistant![/bold blue]\n"
-        f"[green]Using model: {OLLAMA_MODEL}[/green]\n"
+        f"[green]Using chat-model: {OLLAMA_MODEL}[/green]\n"
+        f"[green]Using embed-model: {EMBED_MODEL}[/green]\n"
         "[yellow]Type 'exit', 'quit', or 'bye' to end the conversation.[/yellow]",
-        title="AI Assistant",
+        title="Ollama AI Assistant",
         border_style="cyan"
     ))
     

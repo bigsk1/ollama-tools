@@ -18,7 +18,7 @@ DB_DIR = os.getenv("DB_DIR", "./chromadb")
 OLLAMA_API = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 N_CONTEXTS = int(os.getenv("N_CONTEXTS", "3"))
-SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.7"))
+SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.6"))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 
 # Initialize ChromaDB client with telemetry disabled
