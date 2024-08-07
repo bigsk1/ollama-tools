@@ -52,11 +52,27 @@ python ol.py
 ```
 
 
-## More soon...
-
 ![name](images/name.png)
 
 ![terminal](images/tav2.png)
 
 ![terminal](images/tav.png)
 
+## Examples
+
+Use multiple tools at once
+
+```bash
+<tool_call>
+{"name": "search", "arguments": {"query": "latest ollama tools"}}
+</tool_call>
+
+<tool_call>
+{"name": "create_file", "arguments": {"path": "./web_search.txt"}}
+</tool_call>
+
+<tool_call>
+{"name": "write_to_file", "arguments": {"path": "./web_search.txt", "content": "[Insert Search
+Data Here]"}}
+</tool_call>INFO: Tool executed successfully.
+```
